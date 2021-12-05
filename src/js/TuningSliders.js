@@ -37,9 +37,6 @@ const TuningSliders = {
     cachedGyroSliderValues: false,
     cachedDTermSliderValues: false,
 
-    sliderGyroFilterDisabled: false,
-    sliderDTermFilterDisabled: false,
-
     expertMode: false,
 };
 
@@ -442,8 +439,9 @@ TuningSliders.updateGyroFilterSliderDisplay = function() {
     const lp1Changed = (lp1Static > 0) && (lp1Static !== Math.floor(this.FILTER_DEFAULT.gyro_lowpass_hz * this.sliderGyroFilterMultiplier));
     const lp2Changed = (lp2Freq > 0) && (lp2Freq !== Math.floor(this.FILTER_DEFAULT.gyro_lowpass2_hz * this.sliderGyroFilterMultiplier));
 
-    const hideSlider = (lp1DynMin && (lp1DynamicMinChanged || lp1DynamicMaxChanged)) || (lp1Static && lp1Changed) || (lp2Freq && lp2Changed) || this.sliderGyroFilterDisabled;
-    const lpxDisabled = !lp1DynMin && !lp1Static && !lp2Freq;
+    const lpxChanged = lp1DynamicMinChanged || lp1DynamicMaxChanged || lp1Changed || lp2Changed;
+    const lpxDisabled = lp1DynMin === 0 && lp1Static === 0 && lp2Freq === 0;
+    const hideSlider = lpxChanged || lpxDisabled || FC.TUNING_SLIDERS.slider_gyro_filter === 0;
 
     if (hideSlider) {
         this.GyroSliderUnavailable = true;
@@ -456,8 +454,8 @@ TuningSliders.updateGyroFilterSliderDisplay = function() {
 
     // update Gyro mode and slider
     $('select[id="sliderGyroFilterModeSelect"]').val(this.sliderGyroFilter);
-    $('.sliderGyroFilter').toggleClass('disabledSliders', !this.sliderGyroFilter || lpxDisabled);
-    $('input[id="sliderGyroFilterMultiplier"]').prop('disabled', !this.sliderGyroFilter || lpxDisabled);
+    $('.sliderGyroFilter').toggleClass('disabledSliders', this.GyroSliderUnavailable);
+    $('input[id="sliderGyroFilterMultiplier"]').prop('disabled', this.GyroSliderUnavailable);
 };
 
 TuningSliders.updateDTermFilterSliderDisplay = function() {
@@ -472,8 +470,9 @@ TuningSliders.updateDTermFilterSliderDisplay = function() {
     const lp1Changed = (lp1Static > 0) && (lp1Static !== Math.floor(this.FILTER_DEFAULT.dterm_lowpass_hz * this.sliderDTermFilterMultiplier));
     const lp2Changed = (lp2Freq > 0) && (lp2Freq !== Math.floor(this.FILTER_DEFAULT.dterm_lowpass2_hz * this.sliderDTermFilterMultiplier));
 
-    const hideSlider = (lp1DynMin && (lp1DynamicMinChanged || lp1DynamicMaxChanged)) || (lp1Static && lp1Changed) || (lp2Freq && lp2Changed) || this.sliderDTermFilterDisabled;
-    const lpxDisabled = !lp1DynMin && !lp1Static && !lp2Freq;
+    const lpxChanged = lp1DynamicMinChanged || lp1DynamicMaxChanged || lp1Changed || lp2Changed;
+    const lpxDisabled = lp1DynMin === 0 && lp1Static === 0 && lp2Freq === 0;
+    const hideSlider = lpxChanged || lpxDisabled || FC.TUNING_SLIDERS.slider_dterm_filter === 0;
 
     if (hideSlider) {
         this.DTermSliderUnavailable = true;
@@ -486,19 +485,19 @@ TuningSliders.updateDTermFilterSliderDisplay = function() {
 
     // update DTerm mode and slider
     $('select[id="sliderDTermFilterModeSelect"]').val(this.sliderDTermFilter);
-    $('.sliderDTermFilter').toggleClass('disabledSliders', !this.sliderDTermFilter || lpxDisabled);
-    $('input[id="sliderDTermFilterMultiplier"]').prop('disabled', !this.sliderDTermFilter || lpxDisabled);
+    $('.sliderDTermFilter').toggleClass('disabledSliders', this.DTermSliderUnavailable);
+    $('input[id="sliderDTermFilterMultiplier"]').prop('disabled', this.DTermSliderUnavailable);
 };
 
 TuningSliders.updateFilterSlidersDisplay = function() {
     // check if filters changed manually by comparing current value and those based on slider position
-    this.GyroSliderUnavailable = false;
-    this.DTermSliderUnavailable = false;
 
     if (semver.gte(FC.CONFIG.apiVersion, API_VERSION_1_44)) {
         this.updateGyroFilterSliderDisplay();
         this.updateDTermFilterSliderDisplay();
     } else {
+        this.GyroSliderUnavailable = false;
+        this.DTermSliderUnavailable = false;
         this.legacyUpdateFilterSlidersDisplay();
     }
 
@@ -508,17 +507,15 @@ TuningSliders.updateFilterSlidersDisplay = function() {
 
 TuningSliders.gyroFilterSliderEnable = function() {
     this.sliderGyroFilter = true;
-    this.sliderGyroFilterDisabled = false;
     this.FilterReset = true;
     FC.TUNING_SLIDERS.slider_gyro_filter = 1;
     this.writeFilterSliders();
     this.updateLowpassValues();
-    this.updateFilterSlidersDisplay();
+    this.updateGyroFilterSliderDisplay();
 };
 
 TuningSliders.gyroFilterSliderDisable = function() {
     this.sliderGyroFilter = false;
-    this.sliderGyroFilterDisabled = true;
     this.FilterReset = true;
     FC.TUNING_SLIDERS.slider_gyro_filter = 0;
     this.writeFilterSliders();
@@ -526,17 +523,15 @@ TuningSliders.gyroFilterSliderDisable = function() {
 
 TuningSliders.dtermFilterSliderEnable = function() {
     this.sliderDTermFilter = true;
-    this.sliderDTermFilterDisabled = false;
     this.FilterReset = true;
     FC.TUNING_SLIDERS.slider_dterm_filter = 1;
     this.writeFilterSliders();
     this.updateLowpassValues();
-    this.updateFilterSlidersDisplay();
+    this.updateDTermFilterSliderDisplay();
 };
 
 TuningSliders.dtermFilterSliderDisable = function() {
     this.sliderDTermFilter = false;
-    this.sliderDTermFilterDisabled = true;
     this.FilterReset = true;
     FC.TUNING_SLIDERS.slider_dterm_filter = 0;
     this.writeFilterSliders();
@@ -715,12 +710,30 @@ TuningSliders.calculateNewDTermFilters = function() {
 };
 
 // We need to write filter config to switch filters without having to save.
-TuningSliders.updateFiltersInFirmware = function() {
-    if (semver.gte(FC.CONFIG.apiVersion, API_VERSION_1_44)) {
+TuningSliders.updateFiltersInFirmware = function(filter) {
+    const writeFilters = () => {
         MSP.promise(MSPCodes.MSP_SET_FILTER_CONFIG, mspHelper.crunch(MSPCodes.MSP_SET_FILTER_CONFIG))
-        .then(() => MSPCodes.MSP_SET_TUNING_SLIDERS, mspHelper.crunch(MSPCodes.MSP_SET_TUNING_SLIDERS))
+        .then(() => MSP.promise(MSPCodes.MSP_SET_TUNING_SLIDERS, mspHelper.crunch(MSPCodes.MSP_SET_TUNING_SLIDERS)))
         .then(() => MSP.promise(MSPCodes.MSP_FILTER_CONFIG))
         .then(() => this.updateLowpassValues());
+    };
+
+    if (filter === 'gyro') {
+        FC.FILTER_CONFIG.gyro_lowpass_dyn_min_hz = parseInt($('.pid_filter input[name="gyroLowpassDynMinFrequency"]').val());
+        FC.FILTER_CONFIG.gyro_lowpass_dyn_max_hz = parseInt($('.pid_filter input[name="gyroLowpassDynMaxFrequency"]').val());
+        FC.FILTER_CONFIG.gyro_lowpass_hz = parseInt($('.pid_filter input[name="gyroLowpassFrequency"]').val());
+        FC.FILTER_CONFIG.gyro_lowpass2_hz = parseInt($('.pid_filter input[name="gyroLowpass2Frequency"]').val());
+        if (this.sliderGyroFilter) {
+            writeFilters();
+        }
+    } else if (filter === 'dterm') {
+        FC.FILTER_CONFIG.dterm_lowpass_dyn_min_hz = parseInt($('.pid_filter input[name="dtermLowpassDynMinFrequency"]').val());
+        FC.FILTER_CONFIG.dterm_lowpass_dyn_max_hz = parseInt($('.pid_filter input[name="dtermLowpassDynMinFrequency"]').val());
+        FC.FILTER_CONFIG.dterm_lowpass_hz = parseInt($('.pid_filter input[name="dtermLowpassFrequency"]').val());
+        FC.FILTER_CONFIG.dterm_lowpass2_hz = parseInt($('.pid_filter input[name="dtermLowpass2Frequency"]').val());
+        if (this.sliderDTermFilter) {
+            writeFilters();
+        }
     }
 };
 

@@ -892,11 +892,9 @@ TABS.pid_tuning.initialize = function (callback) {
 
         } else {
 
-            // firmware 4.3 filter selectors for lowpass 1 and 2
+            // firmware 4.3 filter selectors for lowpass 1 and 2; sliders are not yet initialized here
             gyroLowpassEnabled.change(function() {
                 const checked = $(this).is(':checked');
-                let cutoffMin = FILTER_DEFAULT.gyro_lowpass_dyn_min_hz;
-                let cutoffMax = FILTER_DEFAULT.gyro_lowpass_dyn_max_hz;
 
                 if (FC.FILTER_CONFIG.gyro_lowpass_dyn_min_hz > 0 || FC.FILTER_CONFIG.gyro_lowpass_hz > 0) {
                     // lowpass1 is enabled, set the master switch on, show the label, mode selector and type fields
@@ -907,10 +905,7 @@ TABS.pid_tuning.initialize = function (callback) {
                         gyroLowpassDynMinFrequency.val(0);
                         gyroLowpassDynMaxFrequency.val(0);
                         gyroLowpassFrequency.val(0);
-                        FC.FILTER_CONFIG.gyro_lowpass_dyn_min_hz = 0;
-                        FC.FILTER_CONFIG.gyro_lowpass_dyn_max_hz = 0;
-                        FC.FILTER_CONFIG.gyro_lowpass_hz = 0;
-                        TuningSliders.updateFiltersInFirmware();
+                        self.updateFiltersInFirmware('gyro');
                     }
                 } else {
                     // lowpass 1 is disabled, set the master switch off, only show label
@@ -918,61 +913,44 @@ TABS.pid_tuning.initialize = function (callback) {
                         // user is trying to enable the lowpass filter, but it was off (both cutoffs are zero)
                         // initialise in dynamic mode with values at sliders, or use defaults
                         gyroLowpassFilterMode.val(1).change();
-                        cutoffMin = Math.floor(cutoffMin * TuningSliders.sliderGyroFilterMultiplier);
-                        cutoffMax = Math.floor(cutoffMax * TuningSliders.sliderGyroFilterMultiplier);
-                        gyroLowpassDynMinFrequency.val(cutoffMin);
-                        gyroLowpassDynMaxFrequency.val(cutoffMax);
-                        FC.FILTER_CONFIG.gyro_lowpass_dyn_min_hz = cutoffMin;
-                        FC.FILTER_CONFIG.gyro_lowpass_dyn_max_hz = cutoffMax;
-                        TuningSliders.updateFiltersInFirmware();
                     }
                 }
                 gyroLowpassOption.toggle(checked);
-                gyroLowpassOptionStatic.toggle(FC.FILTER_CONFIG.gyro_lowpass_hz !== 0);
-                gyroLowpassOptionDynamic.toggle(FC.FILTER_CONFIG.gyro_lowpass_dyn_min_hz !== 0);
+                gyroLowpassOptionStatic.toggle(checked && FC.FILTER_CONFIG.gyro_lowpass_dyn_min_hz === 0);
+                gyroLowpassOptionDynamic.toggle(checked && FC.FILTER_CONFIG.gyro_lowpass_dyn_min_hz !== 0);
             });
 
             gyroLowpassFilterMode.change(function() {
                 const dynMode = parseInt($(this).val());
-                let cutoff = FILTER_DEFAULT.gyro_lowpass_hz;
-                let cutoffMin = FILTER_DEFAULT.gyro_lowpass_dyn_min_hz;
-                let cutoffMax = FILTER_DEFAULT.gyro_lowpass_dyn_max_hz;
+                let cutoff = FC.FILTER_CONFIG.gyro_lowpass_hz > 0 ? FC.FILTER_CONFIG.gyro_lowpass_hz : FILTER_DEFAULT.gyro_lowpass_hz;
+                let cutoffMin = FC.FILTER_CONFIG.gyro_lowpass_dyn_min_hz > 0 ? FC.FILTER_CONFIG.gyro_lowpass_dyn_min_hz : FILTER_DEFAULT.gyro_lowpass_dyn_min_hz;
+                let cutoffMax = FC.FILTER_CONFIG.gyro_lowpass_dyn_max_hz > 0 ? FC.FILTER_CONFIG.gyro_lowpass_dyn_max_hz : FILTER_DEFAULT.gyro_lowpass_dyn_max_hz;
+
+                if (TuningSliders.sliderGyroFilter) {
+                    if (FC.FILTER_CONFIG.gyro_lowpass_hz === 0) {
+                        cutoff = Math.round(TuningSliders.sliderGyroFilterMultiplier * FILTER_DEFAULT.gyro_lowpass_hz);
+                    }
+                    if (FC.FILTER_CONFIG.gyro_lowpass_dyn_min_hz === 0) {
+                        cutoffMin = Math.round(TuningSliders.sliderGyroFilterMultiplier * FILTER_DEFAULT.gyro_lowpass_dyn_min_hz);
+                        cutoffMax = Math.round(TuningSliders.sliderGyroFilterMultiplier * FILTER_DEFAULT.gyro_lowpass_dyn_max_hz);
+                    }
+                }
 
                 if (dynMode) {
-                    // dynamic mode, set the static field min to zero
                     gyroLowpassFrequency.val(0);
-                    FC.FILTER_CONFIG.gyro_lowpass_hz = 0;
-                    // if dyn min is zero, set dyn min to sliders or default
-                    if (!FC.FILTER_CONFIG.gyro_lowpass_dyn_min_hz) {
-                        if (semver.gte(FC.CONFIG.apiVersion, API_VERSION_1_44) && TuningSliders.sliderGyroFilter) {
-                            cutoffMin = Math.floor(cutoffMin * TuningSliders.sliderGyroFilterMultiplier);
-                            cutoffMax = Math.floor(cutoffMax * TuningSliders.sliderGyroFilterMultiplier);
-                        }
-                        gyroLowpassDynMinFrequency.val(cutoffMin);
-                        gyroLowpassDynMaxFrequency.val(cutoffMax);
-                        FC.FILTER_CONFIG.gyro_lowpass_dyn_min_hz = cutoffMin;
-                        FC.FILTER_CONFIG.gyro_lowpass_dyn_max_hz = cutoffMax;
-                    }
+                    gyroLowpassDynMinFrequency.val(cutoffMin);
+                    gyroLowpassDynMaxFrequency.val(cutoffMax);
                     gyroLowpassOptionStatic.hide();
                     gyroLowpassOptionDynamic.show();
-                    TuningSliders.updateFiltersInFirmware();
+                    self.updateFiltersInFirmware('gyro');
                 } else {
                     // static, set the dynamic field min to zero
                     gyroLowpassDynMinFrequency.val(0);
                     gyroLowpassDynMaxFrequency.val(0);
-                    FC.FILTER_CONFIG.gyro_lowpass_dyn_min_hz = 0;
-                    FC.FILTER_CONFIG.gyro_lowpass_dyn_max_hz = 0;
-                    // If static is zero, set the dynamic cutoff field according to sliders or default
-                    if (!FC.FILTER_CONFIG.gyro_lowpass_hz) {
-                        if (semver.gte(FC.CONFIG.apiVersion, API_VERSION_1_44) && TuningSliders.sliderGyroFilter) {
-                            cutoff = Math.floor(FILTER_DEFAULT.gyro_lowpass_hz * TuningSliders.sliderGyroFilterMultiplier);
-                        }
-                        gyroLowpassFrequency.val(cutoff);
-                        FC.FILTER_CONFIG.gyro_lowpass_hz = cutoff;
-                    }
+                    gyroLowpassFrequency.val(cutoff);
                     gyroLowpassOptionStatic.show();
                     gyroLowpassOptionDynamic.hide();
-                    TuningSliders.updateFiltersInFirmware();
+                    self.updateFiltersInFirmware('gyro');
                 }
             });
 
@@ -981,21 +959,17 @@ TABS.pid_tuning.initialize = function (callback) {
                 const checked = $(this).is(':checked');
                 let cutoff = FC.FILTER_CONFIG.gyro_lowpass2_hz > 0 ? FC.FILTER_CONFIG.gyro_lowpass2_hz : FILTER_DEFAULT.gyro_lowpass2_hz;
 
-                if (TuningSliders.sliderGyroFilter) {
-                    cutoff = checked ? Math.floor(FILTER_DEFAULT.gyro_lowpass2_hz * TuningSliders.sliderGyroFilterMultiplier) : 0;
-                    FC.FILTER_CONFIG.gyro_lowpass2_hz = cutoff;
-                    TuningSliders.updateFiltersInFirmware();
+                if (checked && TuningSliders.sliderGyroFilter && FC.FILTER_CONFIG.gyro_lowpass2_hz === 0) {
+                    cutoff = Math.round(TuningSliders.sliderGyroFilterMultiplier * FILTER_DEFAULT.gyro_lowpass2_hz);
                 }
-
                 gyroLowpass2Frequency.val(checked ? cutoff : 0).attr('disabled', !checked);
                 gyroLowpass2Option.toggle(checked);
+                self.updateFiltersInFirmware('gyro');
                 self.updateFilterWarning();
             });
 
             dtermLowpassEnabled.change(function() {
                 const checked = $(this).is(':checked');
-                let cutoffMin = FILTER_DEFAULT.dterm_lowpass_dyn_min_hz;
-                let cutoffMax = FILTER_DEFAULT.dterm_lowpass_dyn_max_hz;
 
                 if (FC.FILTER_CONFIG.dterm_lowpass_dyn_min_hz > 0 || FC.FILTER_CONFIG.dterm_lowpass_hz > 0) {
                     // lowpass1 is enabled, set the master switch on, show the label, mode selector and type fields
@@ -1006,10 +980,7 @@ TABS.pid_tuning.initialize = function (callback) {
                         dtermLowpassDynMinFrequency.val(0);
                         dtermLowpassDynMaxFrequency.val(0);
                         dtermLowpassFrequency.val(0);
-                        FC.FILTER_CONFIG.dterm_lowpass_dyn_min_hz = 0;
-                        FC.FILTER_CONFIG.dterm_lowpass_dyn_max_hz = 0;
-                        FC.FILTER_CONFIG.dterm_lowpass_hz = 0;
-                        TuningSliders.updateFiltersInFirmware();
+                        self.updateFiltersInFirmware('dterm');
                     }
                 } else {
                     // lowpass 1 is disabled, set the master switch off, only show label
@@ -1017,78 +988,57 @@ TABS.pid_tuning.initialize = function (callback) {
                         // user is trying to enable the lowpass filter, but it was off (both cutoffs are zero)
                         // initialise in dynamic mode with values at sliders, or use defaults
                         dtermLowpassFilterMode.val(1).change();
-                        if (TuningSliders.sliderDTermFilter) {
-                            cutoffMin = Math.floor(cutoffMin * TuningSliders.sliderDTermFilterMultiplier);
-                            cutoffMax = Math.floor(cutoffMax * TuningSliders.sliderDTermFilterMultiplier);
-                        }
-                        dtermLowpassDynMinFrequency.val(cutoffMin);
-                        dtermLowpassDynMaxFrequency.val(cutoffMax);
-                        FC.FILTER_CONFIG.dterm_lowpass_dyn_min_hz = cutoffMin;
-                        FC.FILTER_CONFIG.dterm_lowpass_dyn_max_hz = cutoffMax;
-                        TuningSliders.updateFiltersInFirmware();
                     }
                 }
                 dtermLowpassOption.toggle(checked);
-                dtermLowpassOptionStatic.toggle(FC.FILTER_CONFIG.dterm_lowpass_hz !== 0);
-                dtermLowpassOptionDynamic.toggle(FC.FILTER_CONFIG.dterm_lowpass_dyn_min_hz !== 0);
+                dtermLowpassOptionStatic.toggle(checked && FC.FILTER_CONFIG.dterm_lowpass_dyn_min_hz === 0);
+                dtermLowpassOptionDynamic.toggle(checked && FC.FILTER_CONFIG.dterm_lowpass_dyn_min_hz !== 0);
             });
 
             dtermLowpassFilterMode.change(function() {
                 const dynMode = parseInt($(this).val());
-                let cutoff = FILTER_DEFAULT.dterm_lowpass_hz;
-                let cutoffMin = FILTER_DEFAULT.dterm_lowpass_dyn_min_hz;
-                let cutoffMax = FILTER_DEFAULT.dterm_lowpass_dyn_max_hz;
+                let cutoff = FC.FILTER_CONFIG.dterm_lowpass_hz > 0 ? FC.FILTER_CONFIG.dterm_lowpass_hz : FILTER_DEFAULT.dterm_lowpass_hz;
+                let cutoffMin = FC.FILTER_CONFIG.dterm_lowpass_dyn_min_hz > 0 ? FC.FILTER_CONFIG.dterm_lowpass_dyn_min_hz : FILTER_DEFAULT.dterm_lowpass_dyn_min_hz;
+                let cutoffMax = FC.FILTER_CONFIG.dterm_lowpass_dyn_max_hz > 0 ? FC.FILTER_CONFIG.dterm_lowpass_dyn_max_hz : FILTER_DEFAULT.dterm_lowpass_dyn_max_hz;
+
+                if (TuningSliders.sliderGyroFilter) {
+                    if (FC.FILTER_CONFIG.dterm_lowpass_hz === 0) {
+                        cutoff = Math.round(TuningSliders.sliderDTermFilterMultiplier * FILTER_DEFAULT.dterm_lowpass_hz);
+                    }
+                    if (FC.FILTER_CONFIG.dterm_lowpass_dyn_min_hz === 0) {
+                        cutoffMin = Math.round(TuningSliders.sliderDTermFilterMultiplier * FILTER_DEFAULT.dterm_lowpass_dyn_min_hz);
+                        cutoffMax = Math.round(TuningSliders.sliderDTermFilterMultiplier * FILTER_DEFAULT.dterm_lowpass_dyn_max_hz);
+                    }
+                }
 
                 if (dynMode) {
-                    // dynamic mode, set the static field min to zero
                     dtermLowpassFrequency.val(0);
-                    FC.FILTER_CONFIG.dterm_lowpass_hz = 0;
-                    // if dyn min is zero, set dyn min to sliders or default
-                    if (!FC.FILTER_CONFIG.dterm_lowpass_dyn_min_hz) {
-                        if (TuningSliders.sliderDTermFilter) {
-                            cutoffMin = Math.floor(cutoffMin * TuningSliders.sliderDTermFilterMultiplier);
-                            cutoffMax = Math.floor(cutoffMax * TuningSliders.sliderDTermFilterMultiplier);
-                        }
-                        dtermLowpassDynMinFrequency.val(cutoffMin);
-                        dtermLowpassDynMaxFrequency.val(cutoffMax);
-                        FC.FILTER_CONFIG.dterm_lowpass_dyn_min_hz = cutoffMin;
-                        FC.FILTER_CONFIG.dterm_lowpass_dyn_max_hz = cutoffMax;
-                    }
+                    dtermLowpassDynMinFrequency.val(cutoffMin);
+                    dtermLowpassDynMaxFrequency.val(cutoffMax);
                     dtermLowpassOptionStatic.hide();
                     dtermLowpassOptionDynamic.show();
-                    TuningSliders.updateFiltersInFirmware();
+                    self.updateFiltersInFirmware('dterm');
                 } else {
                     // static, set the dynamic field min to zero
                     dtermLowpassDynMinFrequency.val(0);
                     dtermLowpassDynMaxFrequency.val(0);
-                    FC.FILTER_CONFIG.dterm_lowpass_dyn_min_hz = 0;
-                    FC.FILTER_CONFIG.dterm_lowpass_dyn_max_hz = 0;
-                    // If static is zero, set the dynamic cutoff field according to sliders or default
-                    if (!FC.FILTER_CONFIG.dterm_lowpass_hz) {
-                        if (TuningSliders.sliderDTermFilter) {
-                            cutoff = Math.floor(FILTER_DEFAULT.dterm_lowpass_hz * TuningSliders.sliderDTermFilterMultiplier);
-                        }
-                        dtermLowpassFrequency.val(cutoff);
-                        FC.FILTER_CONFIG.dterm_lowpass_hz = cutoff;
-                    }
+                    dtermLowpassFrequency.val(cutoff);
                     dtermLowpassOptionStatic.show();
                     dtermLowpassOptionDynamic.hide();
-                    TuningSliders.updateFiltersInFirmware();
+                    self.updateFiltersInFirmware('dterm');
                 }
             });
 
             dtermLowpass2Enabled.change(function() {
                 const checked = $(this).is(':checked');
                 let cutoff = FC.FILTER_CONFIG.dterm_lowpass2_hz > 0 ? FC.FILTER_CONFIG.dterm_lowpass2_hz : FILTER_DEFAULT.dterm_lowpass2_hz;
-
-                if (TuningSliders.sliderDTermFilter) {
-                    cutoff = checked ? Math.floor(FILTER_DEFAULT.dterm_lowpass2_hz * TuningSliders.sliderDTermFilterMultiplier) : 0;
-                    FC.FILTER_CONFIG.dterm_lowpass2_hz = cutoff;
-                    TuningSliders.updateFiltersInFirmware();
+                if (checked && TuningSliders.sliderDTermFilter && FC.FILTER_CONFIG.dterm_lowpass2_hz === 0) {
+                    cutoff = Math.round(TuningSliders.sliderDTermFilterMultiplier * FILTER_DEFAULT.dterm_lowpass2_hz);
                 }
 
                 dtermLowpass2Frequency.val(checked ? cutoff : 0).attr('disabled', !checked);
                 dtermLowpass2Option.toggle(checked);
+                self.updateFiltersInFirmware('dterm');
                 self.updateFilterWarning();
             });
         }
@@ -1134,18 +1084,6 @@ TABS.pid_tuning.initialize = function (callback) {
         if (semver.gte(FC.CONFIG.apiVersion, API_VERSION_1_44)) {
             gyroLowpassEnabled.prop('checked', FC.FILTER_CONFIG.gyro_lowpass_hz !== 0 || FC.FILTER_CONFIG.gyro_lowpass_dyn_min_hz !== 0).change();
             dtermLowpassEnabled.prop('checked', FC.FILTER_CONFIG.dterm_lowpass_hz !== 0 || FC.FILTER_CONFIG.dterm_lowpass_dyn_min_hz !== 0).change();
-
-            if (FC.FILTER_CONFIG.gyro_lowpass_hz > 0) {
-                gyroLowpassFilterMode.val(0).change();
-            } else if (FC.FILTER_CONFIG.gyroLowpassDynMinFrequency > 0) {
-                gyroLowpassFilterMode.val(1).change();
-            }
-
-            if (FC.FILTER_CONFIG.dterm_lowpass_hz > 0) {
-                dtermLowpassFilterMode.val(0).change();
-            } else if (FC.FILTER_CONFIG.dtermLowpassDynMinFrequency > 0) {
-                dtermLowpassFilterMode.val(1).change();
-            }
         } else {
             gyroLowpassEnabled.prop('checked', FC.FILTER_CONFIG.gyro_lowpass_hz !== 0).change();
             gyroLowpassDynEnabled.prop('checked', FC.FILTER_CONFIG.gyro_lowpass_dyn_min_hz !== 0 &&
@@ -1402,9 +1340,9 @@ TABS.pid_tuning.initialize = function (callback) {
             FC.TUNING_SLIDERS.slider_roll_pitch_ratio = Math.round(TuningSliders.sliderRollPitchRatio * 20) * 5;
             FC.TUNING_SLIDERS.slider_pitch_pi_gain = Math.round(TuningSliders.sliderPitchPIGain * 20) * 5;
 
-            FC.TUNING_SLIDERS.slider_dterm_filter = TuningSliders.sliderDTermFilter ? 1 : 0;
+            FC.TUNING_SLIDERS.slider_dterm_filter = TuningSliders.sliderDTermFilter;
             FC.TUNING_SLIDERS.slider_dterm_filter_multiplier = Math.round(TuningSliders.sliderDTermFilterMultiplier * 20) * 5;
-            FC.TUNING_SLIDERS.slider_gyro_filter = TuningSliders.sliderGyroFilter ? 1 : 0;
+            FC.TUNING_SLIDERS.slider_gyro_filter = TuningSliders.sliderGyroFilter;
             FC.TUNING_SLIDERS.slider_gyro_filter_multiplier = Math.round(TuningSliders.sliderGyroFilterMultiplier * 20) * 5;
         }
     }
@@ -1513,6 +1451,7 @@ TABS.pid_tuning.initialize = function (callback) {
     }
 
     function process_html() {
+        TABS.pid_tuning.isHtmlProcessing = true;
         FC.FEATURE_CONFIG.features.generateElements($('.tab-pid_tuning .features'));
 
         if (semver.lt(FC.CONFIG.apiVersion, "1.16.0") || semver.gte(FC.CONFIG.apiVersion, "1.20.0")) {
@@ -2233,8 +2172,10 @@ TABS.pid_tuning.initialize = function (callback) {
                     self.saveInitialSettings();
                 }
                 sliderPidsModeSelect.val(FC.TUNING_SLIDERS.slider_pids_mode);
-                sliderGyroFilterModeSelect.val(FC.TUNING_SLIDERS.slider_gyro_filter);
-                sliderDTermFilterModeSelect.val(FC.TUNING_SLIDERS.slider_dterm_filter);
+
+                FC.TUNING_SLIDERS.slider_dterm_filter = TuningSliders.sliderDTermFilter;
+                FC.TUNING_SLIDERS.slider_gyro_filter = TuningSliders.sliderGyroFilter;
+
             } else {
                 $('#dMinSwitch').change(function() {
                     TuningSliders.setDMinFeatureEnabled($(this).is(':checked'));
@@ -2249,7 +2190,7 @@ TABS.pid_tuning.initialize = function (callback) {
                             FC.PIDS[1][2] = FC.ADVANCED_TUNING.dMinPitch;
                             FC.PIDS[2][2] = FC.ADVANCED_TUNING.dMinYaw;
                         }
-                        TuningSliders.calculateNewPids();
+                        self.calculateNewPids();
                     }
                 });
             }
@@ -2291,6 +2232,7 @@ TABS.pid_tuning.initialize = function (callback) {
                     } else {
                         TuningSliders.gyroFilterSliderDisable();
                     }
+                    self.setDirty(true);
                 });
 
                 sliderDTermFilterModeSelect.change(function() {
@@ -2300,13 +2242,8 @@ TABS.pid_tuning.initialize = function (callback) {
                     } else {
                         TuningSliders.dtermFilterSliderDisable();
                     }
+                    self.setDirty(true);
                 });
-
-                // initial gyro mode
-                sliderGyroFilterModeSelect.val(TuningSliders.sliderGyroFilter);
-
-                // initial dterm mode
-                sliderDTermFilterModeSelect.val(TuningSliders.sliderDTermFilter);
             }
 
             let allPidTuningSliders;
@@ -2370,7 +2307,7 @@ TABS.pid_tuning.initialize = function (callback) {
                         TuningSliders.sliderFeedforwardGainLegacy = sliderValue;
                     }
                 }
-                TuningSliders.calculateNewPids();
+                self.calculateNewPids();
                 self.analyticsChanges['PidTuningSliders'] = "On";
             });
             if (semver.lt(FC.CONFIG.apiVersion, API_VERSION_1_44)) {
@@ -2426,7 +2363,7 @@ TABS.pid_tuning.initialize = function (callback) {
                 }
                 slider.val(value);
 
-                TuningSliders.calculateNewPids();
+                self.calculateNewPids();
             });
 
             // enable PID sliders button
@@ -2495,11 +2432,11 @@ TABS.pid_tuning.initialize = function (callback) {
                 const sliderValue = isInt(slider.val()) ? parseInt(slider.val()) : parseFloat(slider.val());
                 if (slider.is('#sliderGyroFilterMultiplier')) {
                     TuningSliders.sliderGyroFilterMultiplier = sliderValue;
-                    TuningSliders.calculateNewGyroFilters();
+                    self.calculateNewGyroFilters();
                     self.analyticsChanges['GyroFilterTuningSlider'] = "On";
                 } else if (slider.is('#sliderDTermFilterMultiplier')) {
                     TuningSliders.sliderDTermFilterMultiplier = sliderValue;
-                    TuningSliders.calculateNewDTermFilters();
+                    self.calculateNewDTermFilters();
                     self.analyticsChanges['DTermFilterTuningSlider'] = "On";
                 }
             });
@@ -2509,10 +2446,10 @@ TABS.pid_tuning.initialize = function (callback) {
                 slider.val(1);
                 if (slider.is('#sliderGyroFilterMultiplier')) {
                     TuningSliders.sliderGyroFilterMultiplier = 1;
-                    TuningSliders.calculateNewGyroFilters();
+                    self.calculateNewGyroFilters();
                 } else if (slider.is('#sliderDTermFilterMultiplier')) {
                     TuningSliders.sliderDTermFilterMultiplier = 1;
-                    TuningSliders.calculateNewDTermFilters();
+                    self.calculateNewDTermFilters();
                 }
             });
 
@@ -2614,12 +2551,7 @@ TABS.pid_tuning.initialize = function (callback) {
             }).then(function () {
                 return MSP.promise(MSPCodes.MSP_SET_FEATURE_CONFIG, mspHelper.crunch(MSPCodes.MSP_SET_FEATURE_CONFIG));
             }).then(function () {
-                let promise;
-                if (semver.gte(FC.CONFIG.apiVersion, API_VERSION_1_44)) {
-                    promise = MSP.promise(MSPCodes.MSP_SET_TUNING_SLIDERS, mspHelper.crunch(MSPCodes.MSP_SET_TUNING_SLIDERS));
-                }
-
-                return promise;
+                return semver.gte(FC.CONFIG.apiVersion, API_VERSION_1_44) ? MSP.promise(MSPCodes.MSP_SET_TUNING_SLIDERS, mspHelper.crunch(MSPCodes.MSP_SET_TUNING_SLIDERS)) : true;
             }).then(function () {
                 return MSP.promise(MSPCodes.MSP_EEPROM_WRITE);
             }).then(function () {
@@ -2654,6 +2586,7 @@ TABS.pid_tuning.initialize = function (callback) {
         self.analyticsChanges = {};
 
         GUI.content_ready(callback);
+        TABS.pid_tuning.isHtmlProcessing = false;
     }
 };
 
@@ -3088,6 +3021,30 @@ TABS.pid_tuning.updateRatesLabels = function() {
 
             stickContext.restore();
         }
+    }
+};
+
+TABS.pid_tuning.updateFiltersInFirmware = function(param) {
+    if (!TABS.pid_tuning.isHtmlProcessing) {
+        TuningSliders.updateFiltersInFirmware(param);
+    }
+};
+
+TABS.pid_tuning.calculateNewPids = function() {
+    if (!TABS.pid_tuning.isHtmlProcessing) {
+        TuningSliders.calculateNewPids();
+    }
+};
+
+TABS.pid_tuning.calculateNewGyroFilters = function() {
+    if (!TABS.pid_tuning.isHtmlProcessing) {
+        TuningSliders.calculateNewGyroFilters();
+    }
+};
+
+TABS.pid_tuning.calculateNewDTermFilters = function() {
+    if (!TABS.pid_tuning.isHtmlProcessing) {
+        TuningSliders.calculateNewDTermFilters();
     }
 };
 
