@@ -2167,14 +2167,14 @@ TABS.pid_tuning.initialize = function (callback) {
 
             if (semver.gte(FC.CONFIG.apiVersion, API_VERSION_1_44)) {
                 if (self.retainConfiguration) {
+                    console.log('WHEN DID WE VISIT HERE AGAIN?');
                     self.setDirty(true);
                 } else {
                     self.saveInitialSettings();
                 }
-                sliderPidsModeSelect.val(FC.TUNING_SLIDERS.slider_pids_mode);
-
-                FC.TUNING_SLIDERS.slider_dterm_filter = TuningSliders.sliderDTermFilter;
-                FC.TUNING_SLIDERS.slider_gyro_filter = TuningSliders.sliderGyroFilter;
+                sliderPidsModeSelect.val(TuningSliders.sliderPidsMode);
+                // this would be the real mode retrieved from firmware
+                // sliderPidsModeSelect.val(FC.TUNING_SLIDERS.slider_pids_mode);
 
             } else {
                 $('#dMinSwitch').change(function() {
@@ -2204,9 +2204,10 @@ TABS.pid_tuning.initialize = function (callback) {
                     const setMode = parseInt($(this).val());
 
                     TuningSliders.sliderPidsMode = setMode;
-                    TuningSliders.calculateNewPids();
-                    TuningSliders.updateFormPids();
-                    TuningSliders.updatePidSlidersDisplay();
+                    if (TuningSliders.sliderPidsMode) {
+                        TuningSliders.calculateNewPids();
+                        TuningSliders.updatePidSlidersDisplay();
+                    }
 
                     const disableRP = !!setMode;
                     const disableY = setMode > 1;
@@ -2219,11 +2220,10 @@ TABS.pid_tuning.initialize = function (callback) {
                         $(this).prop('disabled', disableY);
                     });
 
-                    if (setMode !== self.CONFIGURATOR_TUNING_SLIDERS.slider_pids_mode) {
+                    // if (setMode !== self.CONFIGURATOR_TUNING_SLIDERS.slider_pids_mode) {
                         self.setDirty(true);
-                    }
-
-                }).trigger('change');
+                    // }
+                });
 
                 sliderGyroFilterModeSelect.change(function() {
                     const mode = parseInt($(this).find(':selected').val());
@@ -2691,6 +2691,8 @@ TABS.pid_tuning.saveInitialSettings = function () {
         this.CONFIGURATOR_RC_TUNING = { ...FC.RC_TUNING };
         this.CONFIGURATOR_FEATURE_CONFIG = { ...FC.FEATURE_CONFIG };
         this.CONFIGURATOR_TUNING_SLIDERS = { ...FC.TUNING_SLIDERS};
+
+        console.log('BACKUP', FC.PIDS[0]);
     }
 };
 
@@ -2702,6 +2704,8 @@ TABS.pid_tuning.restoreInitialSettings = function () {
         FC.RC_TUNING = { ...this.CONFIGURATOR_RC_TUNING };
         FC.FEATURE_CONFIG = { ...this.CONFIGURATOR_FEATURE_CONFIG };
         FC.TUNING_SLIDERS = { ...this.CONFIGURATOR_TUNING_SLIDERS };
+
+        console.log('RESTORE', FC.PIDS[0]);
 
         Promise.resolve(true)
         .then(() => MSP.promise(MSPCodes.MSP_SET_PID, mspHelper.crunch(MSPCodes.MSP_SET_PID)))

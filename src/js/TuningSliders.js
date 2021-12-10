@@ -78,6 +78,7 @@ TuningSliders.initialize = function() {
         this.updateDTermFilterSliderDisplay();
         this.updateFilterSlidersWarning();
 
+        $('.subtab-pid .slidersDisabled').hide();
         $('.subtab-filter .slidersDisabled').hide();
     } else {
         this.updateFilterSlidersDisplay();
@@ -85,6 +86,19 @@ TuningSliders.initialize = function() {
         $('select[id="sliderGyroFilterModeSelect"]').hide();
         $('select[id="sliderDTermFilterModeSelect"]').hide();
     }
+
+    $('#pid_main .ROLL .pid_data input, #pid_main .PITCH .pid_data input').each(function() {
+        $(this).prop('disabled', this.sliderPidsMode);
+    });
+
+    $('#pid_main .YAW .pid_data input').each(function() {
+        $(this).prop('disabled', this.sliderPidsMode === 2);
+    });
+
+    // If reading manual values while sliders are on we need to set the sliders off (required for refresh)
+    FC.TUNING_SLIDERS.slider_pids_mode = TuningSliders.sliderPidsMode;
+    FC.TUNING_SLIDERS.slider_dterm_filter = TuningSliders.sliderDTermFilter;
+    FC.TUNING_SLIDERS.slider_gyro_filter = TuningSliders.sliderGyroFilter;
 };
 
 TuningSliders.updateExpertModeSlidersDisplay = function() {
@@ -388,23 +402,40 @@ TuningSliders.updatePidSlidersDisplay = function() {
     // if all of them are equal the values haven't been changed manually
     this.pidSlidersUnavailable = false;
 
-    let rows = 3;
     if (semver.gte(FC.CONFIG.apiVersion, API_VERSION_1_44)) {
-        rows = this.sliderPidsMode === 1 ? 2 : 3;
+        const rollChanged = FC.PIDS[0][0] !== this.PID_DEFAULT[0] || FC.PIDS[0][1] !== this.PID_DEFAULT[1] || FC.PIDS[0][2] !== this.PID_DEFAULT[2];
+        const pitchChanged = FC.PIDS[1][0] !== this.PID_DEFAULT[5] || FC.PIDS[1][1] !== this.PID_DEFAULT[6] || FC.PIDS[1][2] !== this.PID_DEFAULT[7];
+        const yawChanged = FC.PIDS[2][0] !== this.PID_DEFAULT[10] || FC.PIDS[2][1] !== this.PID_DEFAULT[11] || FC.PIDS[2][2] !== this.PID_DEFAULT[12];
+        const ddChanged = FC.ADVANCED_TUNING.dMinRoll !== this.PID_DEFAULT[3] || FC.ADVANCED_TUNING.dMinPitch !== this.PID_DEFAULT[8];
+        const ffChanged = FC.ADVANCED_TUNING.feedforwardRoll !== this.PID_DEFAULT[4] || FC.ADVANCED_TUNING.feedforwardPitch !== this.PID_DEFAULT[9];
+        const rpChanged = rollChanged || pitchChanged || ddChanged || ffChanged;
+        const yChanged = yawChanged || FC.ADVANCED_TUNING.dMinYaw !== this.PID_DEFAULT[13] || FC.ADVANCED_TUNING.feedforwardYaw !== this.PID_DEFAULT[14];
+
+        let pidChanged = false;
+        if (this.sliderPidsMode) {
+            pidChanged = this.sliderPidsMode === 1 ? rpChanged : rpChanged || yChanged;
+        }
+
+        if (pidChanged || !this.sliderPidsMode) {
+            console.log(pidChanged, rollChanged, pitchChanged, yawChanged, ddChanged, ffChanged);
+            TuningSliders.pidSlidersUnavailable = true;
+            this.sliderPidsMode = 0;
+        }
     } else {
         this.calculateNewPids(true);
-    }
 
-    FC.PID_NAMES.forEach(function (elementPid, indexPid) {
-        const pidElements = $(`.pid_tuning .${elementPid} input`);
-        pidElements.each(function (indexInput) {
-            if (indexPid < rows && indexInput < rows) {
-                if (parseInt($(this).val()) !== FC.PIDS[indexPid][indexInput]) {
-                    TuningSliders.pidSlidersUnavailable = true;
+        FC.PID_NAMES.forEach(function (elementPid, indexPid) {
+            const pidElements = $(`.pid_tuning .${elementPid} input`);
+
+            pidElements.each(function (indexInput) {
+                if (indexPid < 3 && indexInput < 3) {
+                    if (parseInt($(this).val()) !== FC.PIDS[indexPid][indexInput]) {
+                        TuningSliders.pidSlidersUnavailable = true;
+                    }
                 }
-            }
+            });
         });
-    });
+    }
 
     if ($('input[id="useIntegratedYaw"]').is(':checked')) {
         this.pidSlidersUnavailable = true;
@@ -415,14 +446,23 @@ TuningSliders.updatePidSlidersDisplay = function() {
     }
 
     if (semver.gte(FC.CONFIG.apiVersion, API_VERSION_1_44)) {
-        if (this.sliderPidsMode === 0) {
-           this.pidSlidersUnavailable = true;
-        }
-    }
+        $('.baseSlider').toggleClass('disabledSliders', this.pidSlidersUnavailable);
+        $('.advancedSlider').toggleClass('disabledSliders', this.pidSlidersUnavailable);
 
-    $('.tuningPIDSliders').toggle(!this.pidSlidersUnavailable);
-    $('.subtab-pid .slidersDisabled').toggle(this.pidSlidersUnavailable);
-    $('.subtab-pid .nonExpertModeSlidersNote').toggle(!this.pidSlidersUnavailable && !this.expertMode);
+        $('#sliderDGain').prop('disabled', this.pidSlidersUnavailable);
+        $('#sliderPIGain').prop('disabled', this.pidSlidersUnavailable);
+        $('#sliderFeedforwardGain').prop('disabled', this.pidSlidersUnavailable);
+        $('#sliderDMaxGain').prop('disabled', this.pidSlidersUnavailable);
+        $('#sliderIGain').prop('disabled', this.pidSlidersUnavailable);
+        $('#sliderRollPitchRatio').prop('disabled', this.pidSlidersUnavailable);
+        $('#sliderPitchPIGain').prop('disabled', this.pidSlidersUnavailable);
+        $('#sliderMasterMultiplier').prop('disabled', this.pidSlidersUnavailable);
+        $('#sliderPidsModeSelect').val(this.sliderPidsMode);
+    } else {
+        $('.tuningPIDSliders').toggle(!this.pidSlidersUnavailable);
+        $('.subtab-pid .slidersDisabled').toggle(this.pidSlidersUnavailable);
+        $('.subtab-pid .nonExpertModeSlidersNote').toggle(!this.pidSlidersUnavailable && !this.expertMode);
+    }
 
     this.updateSlidersWarning(this.pidSlidersUnavailable);
 };
@@ -634,8 +674,7 @@ TuningSliders.legacyCalculatePids = function(updateSlidersOnly = false) {
 TuningSliders.calculateNewPids = function(updateSlidersOnly = false) {
     // this is the main calculation for PID sliders, inputs are in form of slider position values
     // values get set both into forms and their respective variables
-
-    if (semver.gte(FC.CONFIG.apiVersion, API_VERSION_1_44)) {
+    if (semver.gte(FC.CONFIG.apiVersion, API_VERSION_1_44) && this.sliderPidsMode) {
         FC.TUNING_SLIDERS.slider_pids_mode = this.sliderPidsMode;
         //rounds slider values to nearies multiple of 5 and passes to the FW. Avoid dividing calc by (* x 100)/5 = 20
         FC.TUNING_SLIDERS.slider_d_gain = Math.round(this.sliderDGain * 20) * 5;
