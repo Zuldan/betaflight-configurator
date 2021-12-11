@@ -2683,29 +2683,27 @@ TABS.pid_tuning.refresh = function (callback) {
     });
 };
 
+TABS.pid_tuning.copyMultiArray = src => src.map(row => row.map(col => col));
+
 TABS.pid_tuning.saveInitialSettings = function () {
     if (semver.gte(FC.CONFIG.apiVersion, API_VERSION_1_44)) {
-        this.CONFIGURATOR_PIDS = [ ...FC.PIDS ];
+        this.CONFIGURATOR_PIDS = this.copyMultiArray(FC.PIDS);
         this.CONFIGURATOR_ADVANCED_TUNING = { ...FC.ADVANCED_TUNING };
         this.CONFIGURATOR_FILTER_CONFIG = { ...FC.FILTER_CONFIG };
         this.CONFIGURATOR_RC_TUNING = { ...FC.RC_TUNING };
         this.CONFIGURATOR_FEATURE_CONFIG = { ...FC.FEATURE_CONFIG };
         this.CONFIGURATOR_TUNING_SLIDERS = { ...FC.TUNING_SLIDERS};
-
-        console.log('BACKUP', FC.PIDS[0]);
     }
 };
 
 TABS.pid_tuning.restoreInitialSettings = function () {
     if (semver.gte(FC.CONFIG.apiVersion, API_VERSION_1_44)) {
-        FC.PIDS = [ ...this.CONFIGURATOR_PIDS ];
+        FC.PIDS = this.copyMultiArray(this.CONFIGURATOR_PIDS);
         FC.ADVANCED_TUNING = { ...this.CONFIGURATOR_ADVANCED_TUNING };
         FC.FILTER_CONFIG = { ...this.CONFIGURATOR_FILTER_CONFIG };
         FC.RC_TUNING = { ...this.CONFIGURATOR_RC_TUNING };
         FC.FEATURE_CONFIG = { ...this.CONFIGURATOR_FEATURE_CONFIG };
         FC.TUNING_SLIDERS = { ...this.CONFIGURATOR_TUNING_SLIDERS };
-
-        console.log('RESTORE', FC.PIDS[0]);
 
         Promise.resolve(true)
         .then(() => MSP.promise(MSPCodes.MSP_SET_PID, mspHelper.crunch(MSPCodes.MSP_SET_PID)))
