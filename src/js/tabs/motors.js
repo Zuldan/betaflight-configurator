@@ -3,7 +3,6 @@
 TABS.motors = {
     previousDshotBidir: null,
     previousFilterDynQ: null,
-    previousFilterDynWidth: null,
     previousFilterDynCount: null,
     analyticsChanges: {},
     configHasChanged: false,
@@ -666,38 +665,37 @@ TABS.motors.initialize = function (callback) {
         unsyncedPWMSwitchElement.prop('checked', FC.PID_ADVANCED_CONFIG.use_unsyncedPwm !== 0).trigger("change");
         $('input[name="unsyncedpwmfreq"]').val(FC.PID_ADVANCED_CONFIG.motor_pwm_rate);
         $('input[name="digitalIdlePercent"]').val(FC.PID_ADVANCED_CONFIG.digitalIdlePercent);
-        if (semver.gte(FC.CONFIG.apiVersion, API_VERSION_1_42)) {
+        if (semver.gte(FC.CONFIG.apiVersion, API_VERSION_1_44)) {
             dshotBidirElement.prop('checked', FC.MOTOR_CONFIG.use_dshot_telemetry).trigger("change");
 
             self.previousDshotBidir = FC.MOTOR_CONFIG.use_dshot_telemetry;
             self.previousFilterDynQ = FC.FILTER_CONFIG.dyn_notch_q;
-            self.previousFilterDynWidth = FC.FILTER_CONFIG.dyn_notch_width_percent;
             self.previousFilterDynCount = FC.FILTER_CONFIG.dyn_notch_count;
 
             dshotBidirElement.on("change", function () {
                 const value = $(this).prop('checked');
                 const newValue = (value !== FC.MOTOR_CONFIG.use_dshot_telemetry) ? 'On' : 'Off';
+                const dynFilterRpmIsNotChanged = ((self.previousFilterDynQ === FILTER_DEFAULT.dyn_notch_q_rpm) && (self.previousFilterDynCount === FILTER_DEFAULT.dyn_notch_count_rpm));
+                const dynFilterIsNotChanged = ((self.previousFilterDynQ === FILTER_DEFAULT.dyn_notch_q) && (self.previousFilterDynCount === FILTER_DEFAULT.dyn_notch_count));
+
                 self.analyticsChanges['BidirectionalDshot'] = newValue;
                 FC.MOTOR_CONFIG.use_dshot_telemetry = value;
 
                 FC.FILTER_CONFIG.dyn_notch_count = self.previousFilterDynCount;
                 FC.FILTER_CONFIG.dyn_notch_q = self.previousFilterDynQ;
-                FC.FILTER_CONFIG.dyn_notch_width_percent = self.previousFilterDynWidth;
 
                 if (FC.FILTER_CONFIG.gyro_rpm_notch_harmonics !== 0) { // if rpm filter is active
-                    if (value && !self.previousDshotBidir) {
+                    if (value && !self.previousDshotBidir && dynFilterIsNotChanged) {
                         FC.FILTER_CONFIG.dyn_notch_count = FILTER_DEFAULT.dyn_notch_count_rpm;
                         FC.FILTER_CONFIG.dyn_notch_q = FILTER_DEFAULT.dyn_notch_q_rpm;
-                        FC.FILTER_CONFIG.dyn_notch_width_percent = FILTER_DEFAULT.dyn_notch_width_percent_rpm;
-                    } else if (!value && self.previousDshotBidir) {
+                    } else if (!value && self.previousDshotBidir && dynFilterRpmIsNotChanged) {
                         FC.FILTER_CONFIG.dyn_notch_count = FILTER_DEFAULT.dyn_notch_count;
                         FC.FILTER_CONFIG.dyn_notch_q = FILTER_DEFAULT.dyn_notch_q;
-                        FC.FILTER_CONFIG.dyn_notch_width_percent = FILTER_DEFAULT.dyn_notch_width_percent;
                     }
                 }
 
-                const dynFilterNeedChange = (semver.gte(FC.CONFIG.apiVersion, API_VERSION_1_44)) ? (FC.FILTER_CONFIG.dyn_notch_count !== self.previousFilterDynCount) :
-                    (FC.FILTER_CONFIG.dyn_notch_width_percent !== self.previousFilterDynWidth);
+                const dynFilterCanChange = dynFilterIsNotChanged || dynFilterRpmIsNotChanged;
+                const dynFilterNeedChange = ((FC.FILTER_CONFIG.dyn_notch_count !== self.previousFilterDynCount) && dynFilterCanChange);
 
                 if (dynFilterNeedChange) {
                     showDialogDynFiltersChange();

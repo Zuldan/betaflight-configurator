@@ -451,23 +451,25 @@ TABS.pid_tuning.initialize = function (callback) {
                     rpmFilterHarmonics_e.val(FILTER_DEFAULT.gyro_rpm_notch_harmonics);
                 }
 
+                const dynFilterRpmIsNotChanged = ((FC.FILTER_CONFIG.dyn_notch_q === FILTER_DEFAULT.dyn_notch_q_rpm) && (FC.FILTER_CONFIG.dyn_notch_count === FILTER_DEFAULT.dyn_notch_count_rpm));
+                const dynFilterIsNotChanged = ((FC.FILTER_CONFIG.dyn_notch_q === FILTER_DEFAULT.dyn_notch_q) && (FC.FILTER_CONFIG.dyn_notch_count === FILTER_DEFAULT.dyn_notch_count));
+                const dynFilterCanChange = dynFilterIsNotChanged || dynFilterRpmIsNotChanged;
+
                 if (checked !== (FC.FILTER_CONFIG.gyro_rpm_notch_harmonics !== 0)) { // if rpmFilterEnabled is not the same value as saved in the fc
-                    if (checked) {
+                    if (checked && dynFilterIsNotChanged) {
                         dynamicNotchCount_e.val(FILTER_DEFAULT.dyn_notch_count_rpm);
                         dynamicNotchQ_e.val(FILTER_DEFAULT.dyn_notch_q_rpm);
-                        dynamicNotchWidthPercent_e.val(FILTER_DEFAULT.dyn_notch_width_percent_rpm);
-                    } else {
+                    } else if (dynFilterRpmIsNotChanged) {
                         dynamicNotchCount_e.val(FILTER_DEFAULT.dyn_notch_count);
                         dynamicNotchQ_e.val(FILTER_DEFAULT.dyn_notch_q);
-                        dynamicNotchWidthPercent_e.val(FILTER_DEFAULT.dyn_notch_width_percent);
                     }
-
-                    showDialogDynFiltersChange();
+                    if (dynFilterCanChange) {
+                        showDialogDynFiltersChange();
+                    }
 
                 } else { // same value, return saved values
                     dynamicNotchCount_e.val(FC.FILTER_CONFIG.dyn_notch_count);
                     dynamicNotchQ_e.val(FC.FILTER_CONFIG.dyn_notch_q);
-                    dynamicNotchWidthPercent_e.val(FC.FILTER_CONFIG.dyn_notch_width_percent);
                 }
 
                 $('.rpmFilter span.suboption').toggle(checked);
