@@ -625,15 +625,17 @@ TABS.receiver.initialize = function (callback) {
                 });
                 $('select[name="rcSmoothing-setpoint-manual-select"]').change();
 
-                const rcSmoothingAutoFactor = $('input[name="rcSmoothingAutoFactor-number"]');
-                rcSmoothingAutoFactor.val(FC.RX_CONFIG.rcSmoothingAutoFactor);
+                const rcSmoothingAutoFactorNumber = $('input[name="rcSmoothingAutoFactor-number"]');
+                rcSmoothingAutoFactorNumber.val(FC.RX_CONFIG.rcSmoothingAutoFactor);
             } else {
                 $('.tab-receiver .rcSmoothing-auto-factor').hide();
             }
 
-            if (semver.gte(FC.CONFIG.apiVersion, API_VERSION_1_44)) {
-                $('.receiverRcSmoothingAutoFactorHelp').attr('title', i18n.getMessage("receiverRcSmoothingAutoFactorHelp2"));
-            }
+            const RX_DEFAULT = FC.getRxDefaults();
+            const rcSmoothingAutoFactor = RX_DEFAULT.rcSmoothingAutoFactor;
+            const tooltip = i18n.getMessage("receiverRcSmoothingAutoFactorHelp", { autoFactor: rcSmoothingAutoFactor });
+
+            $('.receiverRcSmoothingAutoFactorHelp').attr('title', tooltip);
 
             updateInterpolationView();
         } else {

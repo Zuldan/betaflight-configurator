@@ -700,6 +700,10 @@ const FC = {
             slider_gyro_valid:                  1,
             slider_dterm_valid:                 1,
         };
+
+        this.DEFAULT_RX = {
+            rcSmoothingAutoFactor:              10,
+        };
     },
 
     getSerialRxTypes: () => {
@@ -893,5 +897,15 @@ const FC = {
 
     getSliderDefaults() {
         return this.DEFAULT_TUNING_SLIDERS;
+    },
+
+    getRxDefaults() {
+        let versionRxDefaults = this.DEFAULT_RX;
+
+        if (semver.gte(this.CONFIG.apiVersion, API_VERSION_1_44)) {
+            versionRxDefaults.rcSmoothingAutoFactor = 30;
+        }
+
+        return versionRxDefaults;
     },
 };
