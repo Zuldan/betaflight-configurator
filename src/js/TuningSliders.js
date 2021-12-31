@@ -75,6 +75,7 @@ TuningSliders.initialize = function() {
         this.updateDTermFilterSliderDisplay();
 
         this.updateFilterSlidersWarning();
+        this.updateExpertModeSlidersDisplay();
 
         $('.subtab-pid .slidersDisabled').hide();
         $('.subtab-filter .slidersDisabled').hide();
@@ -156,7 +157,11 @@ TuningSliders.updateExpertModeSlidersDisplay = function() {
     $('.advancedSliderPitchPIGain').toggle(rpIGain || this.expertMode);
     $('.advancedSliderMaster').toggle(master || this.expertMode);
 
-    $('.expertSettingsDetectedNote').toggle((basic || advanced) && !this.expertMode);
+    $('.sliderGyroFilter').toggleClass('disabledSliders', !this.sliderGyroFilter || (gyro && !this.expertMode));
+    $('.sliderDTermFilter').toggleClass('disabledSliders', !this.sliderDTermFilter || (dterm && !this.expertMode));
+
+    $('.subtab-pid .expertSettingsDetectedNote').toggle((basic || advanced) && !this.expertMode);
+    $('.subtab-filter .expertSettingsDetectedNote').toggle((gyro || dterm) && !this.expertMode);
 };
 
 TuningSliders.setExpertMode = function(expertModeEnabled) {
@@ -329,15 +334,21 @@ TuningSliders.updateFilterSlidersWarning = function() {
     let WARNING_FILTER_GYRO_HIGH_GAIN = 1.4;
     let WARNING_FILTER_DTERM_LOW_GAIN = 0.7;
     let WARNING_FILTER_DTERM_HIGH_GAIN = 1.4;
+
     if (semver.gte(FC.CONFIG.apiVersion, API_VERSION_1_44)) {
         WARNING_FILTER_GYRO_LOW_GAIN = 0.45;
         WARNING_FILTER_GYRO_HIGH_GAIN = 1.55;
         WARNING_FILTER_DTERM_LOW_GAIN = 0.75;
         WARNING_FILTER_DTERM_HIGH_GAIN = 1.25;
     }
+
     $('.subtab-filter .slidersWarning').toggle((this.sliderGyroFilterMultiplier >= WARNING_FILTER_GYRO_HIGH_GAIN ||
         this.sliderGyroFilterMultiplier <= WARNING_FILTER_GYRO_LOW_GAIN) ||
             (this.sliderDTermFilterMultiplier >= WARNING_FILTER_DTERM_HIGH_GAIN || this.sliderDTermFilterMultiplier <= WARNING_FILTER_DTERM_LOW_GAIN));
+
+    if (!this.expertModeEnabled) {
+        this.updateExpertModeSlidersDisplay();
+    }
 };
 
 TuningSliders.updatePidSlidersDisplay = function() {
@@ -441,6 +452,8 @@ TuningSliders.updateGyroFilterSliderDisplay = function() {
     $('select[id="sliderGyroFilterModeSelect"]').val(this.sliderGyroFilter);
     $('.sliderGyroFilter').toggleClass('disabledSliders', this.GyroSliderUnavailable);
     $('input[id="sliderGyroFilterMultiplier"]').prop('disabled', this.GyroSliderUnavailable);
+
+    this.updateFilterSlidersWarning();
 };
 
 TuningSliders.updateDTermFilterSliderDisplay = function() {
@@ -470,6 +483,8 @@ TuningSliders.updateDTermFilterSliderDisplay = function() {
     $('select[id="sliderDTermFilterModeSelect"]').val(this.sliderDTermFilter);
     $('.sliderDTermFilter').toggleClass('disabledSliders', this.DTermSliderUnavailable);
     $('input[id="sliderDTermFilterMultiplier"]').prop('disabled', this.DTermSliderUnavailable);
+
+    this.updateFilterSlidersWarning();
 };
 
 TuningSliders.updateFilterSlidersDisplay = function() {
@@ -480,10 +495,10 @@ TuningSliders.updateFilterSlidersDisplay = function() {
         this.updateDTermFilterSliderDisplay();
     } else {
         this.legacyUpdateFilterSlidersDisplay();
+        this.updateFilterSlidersWarning();
     }
 
     $('.subtab-filter .nonExpertModeSlidersNote').toggle((!this.GyroSliderUnavailable || !this.DTermSliderUnavailable) && !this.expertMode);
-    this.updateFilterSlidersWarning(this.GyroSliderUnavailable, this.DTermSliderUnavailable);
 };
 
 TuningSliders.updateFormPids = function(updateSlidersOnly = false) {
