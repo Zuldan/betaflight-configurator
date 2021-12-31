@@ -931,9 +931,7 @@ TABS.pid_tuning.initialize = function (callback) {
                 gyroLowpassDynMinFrequency.val(dynMode ? cutoffMin : 0);
                 gyroLowpassDynMaxFrequency.val(dynMode ? cutoffMax : 0);
 
-                if (TuningSliders.sliderGyroFilter) {
-                    self.calculateNewGyroFilters();
-                }
+                self.calculateNewGyroFilters();
 
                 gyroLowpassOptionStatic.toggle(!dynMode);
                 gyroLowpassOptionDynamic.toggle(!!dynMode);
@@ -946,7 +944,7 @@ TABS.pid_tuning.initialize = function (callback) {
 
                 gyroLowpass2Frequency.val(checked ? cutoff : 0).attr('disabled', !checked);
 
-                if (checked && TuningSliders.sliderGyroFilter) {
+                if (checked) {
                     self.calculateNewGyroFilters();
                 }
 
@@ -992,9 +990,7 @@ TABS.pid_tuning.initialize = function (callback) {
                 dtermLowpassDynMinFrequency.val(dynMode ? cutoffMin : 0);
                 dtermLowpassDynMaxFrequency.val(dynMode ? cutoffMax : 0);
 
-                if (TuningSliders.sliderDTermFilter) {
-                    self.calculateNewDTermFilters();
-                }
+                self.calculateNewDTermFilters();
 
                 dtermLowpassOptionStatic.toggle(!dynMode);
                 dtermLowpassOptionDynamic.toggle(!!dynMode);
@@ -1006,7 +1002,7 @@ TABS.pid_tuning.initialize = function (callback) {
 
                 dtermLowpass2Frequency.val(checked ? cutoff : 0).attr('disabled', !checked);
 
-                if (checked && TuningSliders.sliderDTermFilter) {
+                if (checked) {
                     self.calculateNewDTermFilters();
                 }
 
@@ -2945,13 +2941,17 @@ TABS.pid_tuning.calculateNewPids = function() {
 
 TABS.pid_tuning.calculateNewGyroFilters = function() {
     if (!TABS.pid_tuning.isHtmlProcessing) {
-        TuningSliders.calculateNewGyroFilters();
+        if (TuningSliders.sliderGyroFilter) {
+            TuningSliders.calculateNewGyroFilters();
+        }
     }
 };
 
 TABS.pid_tuning.calculateNewDTermFilters = function() {
     if (!TABS.pid_tuning.isHtmlProcessing) {
-        TuningSliders.calculateNewDTermFilters();
+        if (TuningSliders.sliderDTermFilter) {
+            TuningSliders.calculateNewDTermFilters();
+        }
     }
 };
 
